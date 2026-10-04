@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vanilla RAG</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;line-height:1.5}
+    textarea{width:100%;min-height:110px}button{padding:10px 16px;margin-top:10px;cursor:pointer}
+    .card{border:1px solid #ddd;border-radius:10px;padding:16px;margin:16px 0}.muted{color:#666}
+  </style>
+</head>
+<body>
+  <h1>Vanilla RAG</h1>
+  <p class="muted">Upload a UTF-8 TXT/Markdown document, then ask a grounded question.</p>
+  <input id="file" type="file" accept=".txt,.md" /> <button onclick="upload()">Index document</button>
+  <p id="status"></p>
+  <textarea id="question" placeholder="Ask a question about the indexed document..."></textarea>
+  <button onclick="ask()">Ask</button>
+  <div id="answer"></div>
+<script>
+async function upload(){
+  const f=document.getElementById('file').files[0]; if(!f)return;
+  const fd=new FormData(); fd.append('file',f);
+  const r=await fetch('/api/documents',{method:'POST',body:fd});
+  const d=await r.json(); document.getElementById('status').textContent=r.ok?'Indexed '+d.chunks_added+' chunks.':(d.detail||'Upload failed');
+}
+async function ask(){
+  const q=document.getElementById('question').value;
+  const r=await fetch('/api/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,top_k:4})});
+  const d=await r.json(); const root=document.getElementById('answer');
+  if(!r.ok){root.innerHTML='<div class="card">'+(d.detail||'Request failed')+'</div>';return;}
+  root.innerHTML='<div class="card"><h2>Answer</h2><p>'+escapeHtml(d.answer)+'</p><h3>Citations</h3>'+d.citations.map(c=>'<div class="card"><b>['+c.chunk_id+'] '+escapeHtml(c.source)+'</b><p>'+escapeHtml(c.text)+'</p><small>score: '+c.score+'</small></div>').join('')+'</div>';
+}
+function escapeHtml(s){return s.replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+</script>
+</body>
+</html>
